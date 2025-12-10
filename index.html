@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pithos | Forensic Auditor</title>
+    <title>Pithos | Smart Auditor</title>
     
-    <!-- Libraries -->
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -15,64 +14,72 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        :root { --bg: #000; --fg: #fff; --dim: #666; --border: 1px solid #fff; --accent: #00ff41; }
+        :root { --bg: #000; --fg: #eee; --dim: #666; --border: 1px solid #444; --accent: #00ff41; }
         * { box-sizing: border-box; }
         body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'JetBrains Mono', monospace; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-        header { padding: 10px 20px; border-bottom: var(--border); display: flex; justify-content: space-between; align-items: center; background: #000; z-index: 10; }
-        h1 { margin: 0; font-size: 1.2rem; }
-        
-        .sys-stat { font-size: 0.7rem; color: #666; display: flex; align-items: center; gap: 5px; }
-        .dot { width: 8px; height: 8px; background: #333; border-radius: 50%; }
-        .dot.ready { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+        header { padding: 10px 20px; border-bottom: var(--border); display: flex; justify-content: space-between; align-items: center; background: #111; z-index: 10; }
+        h1 { margin: 0; font-size: 1.1rem; letter-spacing: 1px; }
 
         #workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
 
-        /* VIEWER */
+        /* SMART VIEWER */
         #doc-view { 
             flex: 1; padding: 20px; overflow-y: auto; border-right: var(--border); 
-            font-size: 0.8rem; line-height: 1.6; color: #ccc; white-space: pre-wrap;
-            user-select: text; background: #000;
+            font-size: 0.85rem; line-height: 1.8; color: #aaa; 
+            background: #050505;
         }
+
+        /* Structured Lines */
+        .line-item { 
+            border-bottom: 1px dotted #222; padding: 2px 0; display: flex; flex-wrap: wrap; align-items: baseline;
+        }
+        .line-item:hover { background: #111; }
+        
+        /* Highlights */
+        .hl-money { 
+            color: #ffd700; cursor: pointer; font-weight: bold; border-bottom: 1px solid #ffd700; margin: 0 2px;
+            background: rgba(255, 215, 0, 0.05); padding: 0 2px;
+        }
+        .hl-money:hover { background: #ffd700; color: #000; }
+        
+        .hl-user { 
+            color: #00ffff; cursor: pointer; font-weight: bold; border-bottom: 1px solid #00ffff; margin: 0 2px;
+            background: rgba(0, 255, 255, 0.05); padding: 0 2px;
+        }
+        .hl-user:hover { background: #00ffff; color: #000; }
+
+        .context-kw { color: #fff; font-weight: bold; }
 
         /* CONTROLS */
         #audit-panel { width: 350px; background: #0a0a0a; display: flex; flex-direction: column; border-left: var(--border); }
         .panel-content { flex: 1; padding: 20px; overflow-y: auto; }
         
-        .card { border: var(--border); padding: 15px; margin-bottom: 15px; background: #111; }
-        .label { font-size: 0.7rem; color: #888; display: block; margin-bottom: 5px; }
-        .val-display { font-size: 1.2rem; font-weight: bold; color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        .evidence-text { font-size: 0.7rem; color: #888; margin-top: 5px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card { border: var(--border); padding: 15px; margin-bottom: 15px; background: #111; border-radius: 6px; }
+        .label { font-size: 0.7rem; color: #888; display: block; margin-bottom: 5px; text-transform: uppercase; }
+        .val-display { font-size: 1.3rem; font-weight: bold; color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        .ev-text { font-size: 0.7rem; color: #666; margin-top: 5px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .hl-money { color: #ffd700; cursor: pointer; text-decoration: underline; font-weight: bold; }
-        .hl-money:hover { background: rgba(255, 215, 0, 0.2); }
-        .hl-user { color: #00ffff; cursor: pointer; text-decoration: underline; font-weight: bold; }
-        .hl-user:hover { background: rgba(0, 255, 255, 0.2); }
-        
-        .redacted { color: #222; background: #111; letter-spacing: -3px; cursor: help; }
-        .redacted:hover { background: #222; color: #444; }
-        .revealed { color: #ccc; background: transparent; letter-spacing: normal; animation: fadeIn 0.5s; border-left: 2px solid #555; padding-left: 5px; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .active-line { color: #fff; margin: 2px 0; background: #111; padding: 2px 0; border-left: 2px solid var(--accent); padding-left: 8px; }
-
-        .verdict-box { text-align: center; padding: 10px; margin-top: 10px; border: 1px solid #333; }
-        .scam { color: #ff0055; border-color: #ff0055; }
-        .safe { color: var(--accent); border-color: var(--accent); }
-
-        .btn-action { width: 100%; padding: 12px; background: #333; color: #fff; border: 1px solid #fff; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-action { width: 100%; padding: 12px; background: #222; color: #fff; border: 1px solid #666; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
         .btn-action:hover { background: #fff; color: #000; }
 
+        /* VERDICT */
+        .verdict-box { text-align: center; padding: 15px; margin-top: 10px; border: 1px solid #333; border-radius: 6px; }
+        .scam { color: #ff0055; border-color: #ff0055; background: rgba(255, 0, 85, 0.1); }
+        .safe { color: var(--accent); border-color: var(--accent); background: rgba(0, 255, 65, 0.1); }
+
+        /* OVERLAY */
         #drop-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 20; display: flex;
+            background: rgba(0,0,0,0.92); z-index: 20; display: flex;
             flex-direction: column; align-items: center; justify-content: center;
         }
         .btn-upload {
-            background: #333; color: #888; border: 1px solid #666; padding: 15px 30px;
-            font-weight: bold; font-size: 1.2rem; cursor: not-allowed; border-radius: 4px; margin-top: 20px; transition: 0.3s;
+            background: var(--accent); color: #000; border: none; padding: 15px 40px;
+            font-weight: bold; font-size: 1.2rem; cursor: pointer; border-radius: 50px; margin-top: 20px;
+            box-shadow: 0 0 20px rgba(0,255,65,0.4);
         }
-        .btn-upload.active { background: var(--accent); color: #000; border-color: var(--accent); cursor: pointer; }
-        #loading { display: none; color: var(--accent); position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index: 30; text-align: center;}
+        #loading { display: none; color: var(--accent); position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index: 30; text-align: center; background:#000; padding:20px; border:1px solid var(--accent); }
 
         @media (max-width: 768px) {
             #workspace { flex-direction: column; }
@@ -85,96 +92,109 @@
 
     <header>
         <div style="display:flex; align-items:center; gap:10px;">
-            <i class="fas fa-search-dollar" style="color:var(--accent);"></i>
-            <h1>FORENSIC AUDITOR</h1>
+            <i class="fas fa-robot" style="color:var(--accent);"></i>
+            <h1>SMART AUDITOR</h1>
         </div>
-        <div class="sys-stat"><span id="stat-text">BOOTING...</span><div id="stat-dot" class="dot"></div></div>
+        <div style="font-size:0.7rem; color:#666;">LAYOUT RECONSTRUCTION: ON</div>
     </header>
 
     <div id="workspace">
         <div id="doc-view">
-            <div style="text-align:center; color:#444; margin-top:50px;">// SECURE VIEWER //</div>
+            <div style="text-align:center; color:#444; margin-top:50px;">
+                // SMART VIEWER //<br>
+                Drag & Drop PDF to start layout analysis.
+            </div>
         </div>
 
         <div id="audit-panel">
             <div class="panel-content">
                 <div class="card">
-                    <span class="label">TARGET (自動入力/編集可)</span>
-                    <input type="text" id="project-name" placeholder="事業名を入力..." style="width:100%; background:transparent; border:none; color:#fff; font-family:inherit; border-bottom:1px dashed #444;">
+                    <span class="label">TARGET</span>
+                    <input type="text" id="doc-name" placeholder="..." disabled style="width:100%; background:transparent; border:none; color:#888;">
                 </div>
                 
-                <div class="card" style="border-color: #ffd700;">
+                <div class="card" style="border-left: 3px solid #ffd700;">
                     <span class="label">1. BUDGET (予算)</span>
                     <div id="disp-budget" class="val-display">0</div>
-                    <div id="ev-budget" class="evidence-text">...</div>
+                    <div id="ev-budget" class="ev-text">...</div>
                 </div>
 
-                <div class="card" style="border-color: #00ffff;">
+                <div class="card" style="border-left: 3px solid #00ffff;">
                     <span class="label">2. USERS (人数)</span>
                     <div id="disp-user" class="val-display">0</div>
-                    <div id="ev-user" class="evidence-text">...</div>
+                    <div id="ev-user" class="ev-text">...</div>
                 </div>
 
                 <div id="verdict-area" class="verdict-box" style="display:none;">
-                    <div style="font-size:0.7rem;">D_INDEX</div>
-                    <div id="d-val" style="font-size:2.5rem; font-weight:bold;">0.0</div>
-                    <div id="d-res">---</div>
+                    <div style="font-size:0.7rem; margin-bottom:5px;">DISTORTION INDEX</div>
+                    <div id="d-val" style="font-size:3rem; font-weight:bold; line-height:1;">0.0</div>
+                    <div id="d-res" style="font-weight:bold; letter-spacing:2px; margin-top:5px;">---</div>
                 </div>
             </div>
             
             <div style="padding:20px; border-top:var(--border);">
-                <button class="btn-action" py-click="export_report">
-                    <i class="fas fa-file-export"></i> GENERATE REPORT
-                </button>
-                <button class="btn-action" style="background:#000; color:#888; border-color:#444;" onclick="location.reload()">RESET</button>
+                <button class="btn-action" py-click="export_report">DOWNLOAD REPORT</button>
+                <button class="btn-action" onclick="location.reload()" style="background:transparent; border-color:#444; color:#666;">RESET</button>
             </div>
         </div>
 
         <div id="drop-overlay">
-            <i class="fas fa-file-shield" style="font-size:4rem; color:#666;"></i>
+            <i class="fas fa-file-invoice-dollar" style="font-size:4rem; color:#444;"></i>
             <h2 style="margin-top:20px; color:#ccc;">DROP PDF</h2>
-            <button id="btn-select" class="btn-upload" disabled onclick="document.getElementById('file-in').click()">INITIALIZING...</button>
+            <button id="btn-select" class="btn-upload" onclick="document.getElementById('file-in').click()">OPEN FILE</button>
             <input type="file" id="file-in" style="display:none;" accept="application/pdf">
         </div>
-        <div id="loading"><i class="fas fa-cog fa-spin" style="font-size:2rem;"></i><br><br>CONTEXT ANALYSIS...</div>
+        <div id="loading">
+            <i class="fas fa-microchip fa-spin"></i><br><br>RECONSTRUCTING LAYOUT...
+        </div>
     </div>
 
-    <!-- JS -->
+    <!-- JS: Smart PDF Layout Parser -->
     <script>
-        function revealText(el, originalText) {
-            el.innerText = originalText; el.className = "revealed"; el.onclick = null;
-        }
-
         const fileIn = document.getElementById('file-in');
         fileIn.onchange = (e) => { if (e.target.files[0]) loadPDF(e.target.files[0]); };
 
         async function loadPDF(file) {
-            // Use filename as initial project name guess
-            document.getElementById('project-name').value = file.name.replace(".pdf", "");
+            document.getElementById('doc-name').value = file.name;
             document.getElementById('drop-overlay').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
 
             try {
                 const buffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(buffer).promise;
-                let text = "";
-                const max = Math.min(pdf.numPages, 50);
+                let textLines = [];
+                const max = Math.min(pdf.numPages, 30);
                 
                 for (let i = 1; i <= max; i++) {
                     const page = await pdf.getPage(i);
                     const content = await page.getTextContent();
-                    let lastY = -1;
-                    let pageText = "";
-                    for (let item of content.items) {
-                        if (lastY != -1 && Math.abs(item.transform[5] - lastY) > 5) pageText += "\n";
-                        else if (lastY != -1) pageText += " ";
-                        pageText += item.str;
-                        lastY = item.transform[5];
-                    }
-                    text += pageText + "\n";
+                    
+                    // --- LAYOUT RECONSTRUCTION ENGINE ---
+                    // 1. Group items by Y coordinate (Tolerance: 5px)
+                    const yGroup = {};
+                    content.items.forEach(item => {
+                        const y = Math.round(item.transform[5] / 5) * 5; // Quantize Y
+                        if (!yGroup[y]) yGroup[y] = [];
+                        yGroup[y].push(item);
+                    });
+
+                    // 2. Sort lines (Top to Bottom)
+                    const sortedYs = Object.keys(yGroup).sort((a, b) => b - a);
+
+                    // 3. Join items in each line (Left to Right)
+                    sortedYs.forEach(y => {
+                        const lineItems = yGroup[y].sort((a, b) => a.transform[4] - b.transform[4]);
+                        const lineStr = lineItems.map(it => it.str).join(" "); // Add space between cols
+                        if (lineStr.trim()) textLines.push(lineStr);
+                    });
                 }
-                window.py_process_secure(text);
-            } catch (e) { alert("Error: " + e); location.reload(); }
+                
+                const fullText = textLines.join("\n");
+                window.py_process_smart(fullText);
+
+            } catch (e) {
+                alert("Parsing Error: " + e); location.reload();
+            }
         }
 
         function downloadFile(filename, content) {
@@ -183,17 +203,9 @@
             const a = document.createElement('a');
             a.href = url; a.download = filename; a.click();
         }
-
-        function systemReady() {
-            document.getElementById('stat-text').innerText = "SYSTEM READY";
-            document.getElementById('stat-text').style.color = "#00ff41";
-            document.getElementById('stat-dot').classList.add('ready');
-            const btn = document.getElementById('btn-select');
-            btn.disabled = false; btn.innerText = "📂 OPEN FILE"; btn.classList.add('active');
-        }
     </script>
 
-    <!-- PYTHON -->
+    <!-- PYTHON: Smart Filters -->
     <script type="py">
         from pyscript import document
         from pyodide.ffi import create_proxy
@@ -202,53 +214,59 @@
         
         current_budget = 0
         current_users = 0
-        evidence_budget = ""
-        evidence_users = ""
+        ev_b = ""
+        ev_u = ""
 
-        KW = ["予算", "決算", "事業", "概要", "目的", "成果", "合計", "歳出", "歳入", "内訳", "費用", "対象", "【", "】", "■", "●", "・", "円", "人", "年度", "基金", "繰入", "補正", "委託", "工事"]
+        # Filters
+        KW_CONTEXT = ["事業", "決算", "予算", "概要", "費", "金", "合計", "内訳", "報酬", "委託", "工事"]
         
+        # Regex (Strict)
         re_money = re.compile(r'([0-9,]+(兆|億|万|千)?円)')
-        re_ppl = re.compile(r'([0-9,]+(人|名|世帯))')
+        re_ppl = re.compile(r'([0-9,]+(人|名|世帯|団体|件|回))') # Units expanded
 
-        def process_secure(raw_text):
+        def process_smart(raw_text):
             lines = raw_text.split('\n')
-            safe_html = ""
+            html = ""
             
+            def repl_m(m):
+                val = parse_jp_money(m.group(0))
+                # Filter: Ignore < 100,000 yen (dates, page nums)
+                if val < 100000: return m.group(0)
+                txt = m.group(0).replace("'", "")
+                return f'<span class="hl-money" onclick="window.set_budget({val}, \'{txt}\')">{m.group(0)}</span>'
+
+            def repl_p(m):
+                val = parse_num(m.group(0))
+                # Filter: Ignore 0 or huge outlier
+                if val == 0: return m.group(0)
+                txt = m.group(0).replace("'", "")
+                return f'<span class="hl-user" onclick="window.set_user({val}, \'{txt}\')">{m.group(0)}</span>'
+
             for line in lines:
                 s_line = line.strip()
                 if not s_line: continue
-                
-                has_m = re_money.search(s_line)
-                has_p = re_ppl.search(s_line)
-                safe_text = s_line.replace('"', '&quot;').replace("'", "&#39;")
 
-                if has_m or has_p:
-                    proc = s_line
-                    
-                    def repl_m(m):
-                        val = parse_jp_money(m.group(0))
-                        if val < 100000: return m.group(0)
-                        return f'<span class="hl-money" onclick="window.set_budget({val}, \'{safe_text}\')">{m.group(0)}</span>'
-                    
-                    def repl_p(m):
-                        val = parse_num(m.group(0))
-                        return f'<span class="hl-user" onclick="window.set_user({val}, \'{safe_text}\')">{m.group(0)}</span>'
-                    
-                    proc = re_money.sub(repl_m, proc)
-                    proc = re_ppl.sub(repl_p, proc)
-                    safe_html += f"<div class='active-line'>{proc}</div>"
-                
-                elif any(k in s_line for k in KW):
-                    safe_html += f"<div class='context-line'>{s_line}</div>"
-                else:
-                    mask = "░" * min(len(s_line), 40)
-                    safe_html += f"<div class='redacted' onclick=\"revealText(this, '{safe_text}')\">{mask}</div>"
+                # Noise Filter: Skip lines that look like just dates or page nums
+                if re.match(r'^[0-9\s/-]+$', s_line): continue 
 
-            document.getElementById('doc-view').innerHTML = safe_html
+                # Process
+                proc = s_line
+                
+                # Bold Keywords
+                for k in KW_CONTEXT:
+                    if k in proc: proc = proc.replace(k, f"<span class='context-kw'>{k}</span>")
+
+                # Inject Handlers
+                proc = re_money.sub(repl_m, proc)
+                proc = re_ppl.sub(repl_p, proc)
+                
+                html += f"<div class='line-item'>{proc}</div>"
+
+            document.getElementById('doc-view').innerHTML = html
             document.getElementById('loading').style.display = 'none'
 
         def parse_jp_money(s):
-            s = s.replace(",","").replace("円","")
+            s = s.replace(",","").replace("円","").strip()
             unit = 1
             if "兆" in s: unit=1000000000000; s=s.replace("兆","")
             if "億" in s: unit=100000000; s=s.replace("億","")
@@ -257,103 +275,73 @@
             except: return 0
 
         def parse_num(s):
-            s = s.replace(",","").replace("人","").replace("名","").replace("世帯","")
+            # Strip non-numeric chars except ,
+            s = re.sub(r'[^0-9,]', '', s)
+            s = s.replace(",","")
             try: return float(s)
             except: return 0
 
-        def set_budget_py(val, text):
-            global current_budget, evidence_budget
+        def set_budget_py(val, txt):
+            global current_budget, ev_b
             current_budget = val
-            evidence_budget = text
+            ev_b = txt
             document.getElementById('disp-budget').innerText = f"¥{int(val):,}"
-            document.getElementById('ev-budget').innerText = f"\"{text}\""
+            document.getElementById('ev-budget').innerText = txt
             calc()
 
-        def set_user_py(val, text):
-            global current_users, evidence_users
+        def set_user_py(val, txt):
+            global current_users, ev_u
             current_users = val
-            evidence_users = text
-            document.getElementById('disp-user').innerText = f"{int(val):,} 人"
-            document.getElementById('ev-user').innerText = f"\"{text}\""
+            ev_u = txt
+            document.getElementById('disp-user').innerText = f"{int(val):,}"
+            document.getElementById('ev-user').innerText = txt
             calc()
 
         def calc():
             if current_users == 0: return
+            # SBCM Unit: 30M yen / 72k people
             d = (current_budget / 30000000) / (current_users / 72000)
+            
             el_val = document.getElementById('d-val')
             el_res = document.getElementById('d-res')
             box = document.getElementById('verdict-area')
             box.style.display = 'block'
+            
             el_val.innerText = f"{d:.1f}"
-            if d > 50:
+            
+            if d > 10:
                 el_res.innerText = "🚨 SCAM"
                 box.className = "verdict-box scam"
-            elif d > 10:
-                el_res.innerText = "⚠️ CRITICAL"
-                box.className = "verdict-box scam"
             else:
-                el_res.innerText = "✅ SUSTAINABLE"
+                el_res.innerText = "✅ SAFE"
                 box.className = "verdict-box safe"
 
         def export_report(e):
-            p_name = document.getElementById('project-name').value
-            d_val = float(document.getElementById('d-val').innerText)
+            if current_budget == 0: return
+            fname = document.getElementById('doc-name').value
+            d_val = document.getElementById('d-val').innerText
+            verdict = document.getElementById('d-res').innerText
             
-            # --- AUTO COMMENT LOGIC ---
-            if d_val > 50:
-                rank = "🥇 WORST 1"
-                status = "SCAM (詐欺レベル)"
-                comment = "SBCM基準を大幅に逸脱しています。住民1人あたりの負担が異常であり、直ちに監査が必要です。典型的な『ハコモノ』または『中抜き』の疑いがあります。"
-            elif d_val > 10:
-                rank = "🥈 CRITICAL"
-                status = "High Distortion (歪み)"
-                comment = "費用対効果が極めて低いです。目的に対して予算が過大か、あるいは受益者が限定的すぎます。事業の縮小または廃止を検討すべきレベルです。"
-            elif d_val < 1:
-                rank = "💎 EXCELLENT"
-                status = "High Efficiency (高効率)"
-                comment = "極めて低コストで多くの市民にサービスを提供できています。他の自治体の模範となる『神運営』です。"
-            else:
-                rank = "✅ STANDARD"
-                status = "Normal Range (適正)"
-                comment = "SBCM基準内です。インフラとして適正なコストバランスが保たれています。"
-
-            # REPORT TEMPLATE
             md = f"""# 🏛️ SBCM Audit Report
-**Date:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
-**Project:** {p_name}
-**Auditor:** Pithos Secure Module
+**Target:** {fname}
+**Date:** {datetime.now().strftime("%Y-%m-%d")}
 
 ---
+## 📊 Result
+*   **Verdict:** {verdict}
+*   **D_Index:** {d_val}
 
-## {rank}: {p_name}
-**～ {status} ～**
-
-*   **決算額:** ¥{int(current_budget):,}
-*   **推定受益者数:** {int(current_users):,} 人
-*   **歪み指数 ($D$):** **{d_val}**
-*   **1人あたりコスト:** ¥{int(current_budget/current_users):,} / 人
-
-### 💬 監査官コメント
-{comment}
-
+## 🔍 Evidence
+*   **Budget:** ¥{int(current_budget):,} (Src: "{ev_b}")
+*   **Beneficiaries:** {int(current_users):,} (Src: "{ev_u}")
 ---
-
-## 🔍 Evidence (抽出根拠)
-> **予算ソース:**
-> "{evidence_budget}"
->
-> **人数ソース:**
-> "{evidence_users}"
-
----
-*Generated by Pithos OS*
+*Generated by Pithos Smart Auditor*
 """
-            js.downloadFile(f"SBCM_Audit_{p_name}.md", md)
+            js.downloadFile(f"Audit_{fname}.md", md)
 
-        js.window.py_process_secure = create_proxy(process_secure)
+        js.window.py_process_smart = create_proxy(process_smart)
         js.window.set_budget = create_proxy(set_budget_py)
         js.window.set_user = create_proxy(set_user_py)
-        js.systemReady()
     </script>
 </body>
 </html>
