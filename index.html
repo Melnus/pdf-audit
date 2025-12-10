@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pithos | Secure Auditor</title>
+    <title>Pithos | Forensic Auditor</title>
     
+    <!-- Libraries -->
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -30,8 +31,8 @@
         /* VIEWER */
         #doc-view { 
             flex: 1; padding: 20px; overflow-y: auto; border-right: var(--border); 
-            font-size: 0.8rem; line-height: 1.6; color: #aaa; white-space: pre-wrap;
-            user-select: none; -webkit-user-select: none; background: #000;
+            font-size: 0.8rem; line-height: 1.6; color: #ccc; white-space: pre-wrap;
+            user-select: text; background: #000;
         }
 
         /* CONTROLS */
@@ -41,25 +42,17 @@
         .card { border: var(--border); padding: 15px; margin-bottom: 15px; background: #111; }
         .label { font-size: 0.7rem; color: #888; display: block; margin-bottom: 5px; }
         .val-display { font-size: 1.2rem; font-weight: bold; color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        
+        .evidence-text { font-size: 0.7rem; color: #888; margin-top: 5px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
         .hl-money { color: #ffd700; cursor: pointer; text-decoration: underline; font-weight: bold; }
         .hl-money:hover { background: rgba(255, 215, 0, 0.2); }
         .hl-user { color: #00ffff; cursor: pointer; text-decoration: underline; font-weight: bold; }
         .hl-user:hover { background: rgba(0, 255, 255, 0.2); }
         
-        /* REDACTION LOGIC */
-        .redacted { 
-            color: #222; background: #111; letter-spacing: -3px; 
-            cursor: help; transition: 0.2s; border-bottom: 1px dotted #333;
-        }
+        .redacted { color: #222; background: #111; letter-spacing: -3px; cursor: help; }
         .redacted:hover { background: #222; color: #444; }
-        
-        .revealed { 
-            color: #ccc; background: transparent; letter-spacing: normal; 
-            animation: fadeIn 0.5s; border-left: 2px solid #555; padding-left: 5px;
-        }
+        .revealed { color: #ccc; background: transparent; letter-spacing: normal; animation: fadeIn 0.5s; border-left: 2px solid #555; padding-left: 5px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
         .active-line { color: #fff; margin: 2px 0; background: #111; padding: 2px 0; border-left: 2px solid var(--accent); padding-left: 8px; }
 
         .verdict-box { text-align: center; padding: 10px; margin-top: 10px; border: 1px solid #333; }
@@ -79,7 +72,6 @@
             font-weight: bold; font-size: 1.2rem; cursor: not-allowed; border-radius: 4px; margin-top: 20px; transition: 0.3s;
         }
         .btn-upload.active { background: var(--accent); color: #000; border-color: var(--accent); cursor: pointer; }
-        
         #loading { display: none; color: var(--accent); position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index: 30; text-align: center;}
 
         @media (max-width: 768px) {
@@ -93,45 +85,47 @@
 
     <header>
         <div style="display:flex; align-items:center; gap:10px;">
-            <i class="fas fa-shield-alt" style="color:var(--accent);"></i>
-            <h1>SECURE AUDITOR</h1>
+            <i class="fas fa-search-dollar" style="color:var(--accent);"></i>
+            <h1>FORENSIC AUDITOR</h1>
         </div>
         <div class="sys-stat"><span id="stat-text">BOOTING...</span><div id="stat-dot" class="dot"></div></div>
     </header>
 
     <div id="workspace">
         <div id="doc-view">
-            <div style="text-align:center; color:#444; margin-top:50px;">
-                // SECURE VIEWER //<br>
-                1. 数字が含まれる行はハイライトされます。<br>
-                2. 黒塗り部分はタップすると読めます。
-            </div>
+            <div style="text-align:center; color:#444; margin-top:50px;">// SECURE VIEWER //</div>
         </div>
 
         <div id="audit-panel">
             <div class="panel-content">
                 <div class="card">
-                    <span class="label">TARGET FILE</span>
-                    <input type="text" id="doc-name" placeholder="..." disabled style="width:100%; background:transparent; border:none; color:#888;">
+                    <span class="label">TARGET (自動入力/編集可)</span>
+                    <input type="text" id="project-name" placeholder="事業名を入力..." style="width:100%; background:transparent; border:none; color:#fff; font-family:inherit; border-bottom:1px dashed #444;">
                 </div>
+                
                 <div class="card" style="border-color: #ffd700;">
                     <span class="label">1. BUDGET (予算)</span>
                     <div id="disp-budget" class="val-display">0</div>
-                    <div style="font-size:0.7rem; color:#ffd700; margin-top:5px;">[TAP YELLOW TEXT]</div>
+                    <div id="ev-budget" class="evidence-text">...</div>
                 </div>
+
                 <div class="card" style="border-color: #00ffff;">
                     <span class="label">2. USERS (人数)</span>
                     <div id="disp-user" class="val-display">0</div>
-                    <div style="font-size:0.7rem; color:#00ffff; margin-top:5px;">[TAP BLUE TEXT]</div>
+                    <div id="ev-user" class="evidence-text">...</div>
                 </div>
+
                 <div id="verdict-area" class="verdict-box" style="display:none;">
                     <div style="font-size:0.7rem;">D_INDEX</div>
                     <div id="d-val" style="font-size:2.5rem; font-weight:bold;">0.0</div>
                     <div id="d-res">---</div>
                 </div>
             </div>
+            
             <div style="padding:20px; border-top:var(--border);">
-                <button class="btn-action" py-click="export_md">EXPORT</button>
+                <button class="btn-action" py-click="export_report">
+                    <i class="fas fa-file-export"></i> GENERATE REPORT
+                </button>
                 <button class="btn-action" style="background:#000; color:#888; border-color:#444;" onclick="location.reload()">RESET</button>
             </div>
         </div>
@@ -142,22 +136,21 @@
             <button id="btn-select" class="btn-upload" disabled onclick="document.getElementById('file-in').click()">INITIALIZING...</button>
             <input type="file" id="file-in" style="display:none;" accept="application/pdf">
         </div>
-        <div id="loading"><i class="fas fa-cog fa-spin" style="font-size:2rem;"></i><br><br>ANALYZING...</div>
+        <div id="loading"><i class="fas fa-cog fa-spin" style="font-size:2rem;"></i><br><br>CONTEXT ANALYSIS...</div>
     </div>
 
-    <!-- JS: REVEAL LOGIC -->
+    <!-- JS -->
     <script>
         function revealText(el, originalText) {
-            el.innerText = originalText;
-            el.className = "revealed";
-            el.onclick = null; // Remove handler
+            el.innerText = originalText; el.className = "revealed"; el.onclick = null;
         }
 
         const fileIn = document.getElementById('file-in');
         fileIn.onchange = (e) => { if (e.target.files[0]) loadPDF(e.target.files[0]); };
 
         async function loadPDF(file) {
-            document.getElementById('doc-name').value = file.name;
+            // Use filename as initial project name guess
+            document.getElementById('project-name').value = file.name.replace(".pdf", "");
             document.getElementById('drop-overlay').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
 
@@ -205,9 +198,14 @@
         from pyscript import document
         from pyodide.ffi import create_proxy
         import js, re
+        from datetime import datetime
         
         current_budget = 0
         current_users = 0
+        evidence_budget = ""
+        evidence_users = ""
+
+        KW = ["予算", "決算", "事業", "概要", "目的", "成果", "合計", "歳出", "歳入", "内訳", "費用", "対象", "【", "】", "■", "●", "・", "円", "人", "年度", "基金", "繰入", "補正", "委託", "工事"]
         
         re_money = re.compile(r'([0-9,]+(兆|億|万|千)?円)')
         re_ppl = re.compile(r'([0-9,]+(人|名|世帯))')
@@ -216,36 +214,33 @@
             lines = raw_text.split('\n')
             safe_html = ""
             
-            # Helper: Replacers
-            def repl_m(m):
-                val = parse_jp_money(m.group(0))
-                if val < 100000: return m.group(0)
-                return f'<span class="hl-money" onclick="window.set_budget({val})">{m.group(0)}</span>'
-
-            def repl_p(m):
-                val = parse_num(m.group(0))
-                return f'<span class="hl-user" onclick="window.set_user({val})">{m.group(0)}</span>'
-
             for line in lines:
                 s_line = line.strip()
                 if not s_line: continue
                 
-                # Check for data
                 has_m = re_money.search(s_line)
                 has_p = re_ppl.search(s_line)
-                
-                # Encode text for JS safety
                 safe_text = s_line.replace('"', '&quot;').replace("'", "&#39;")
 
                 if has_m or has_p:
-                    # Active Line (Show)
                     proc = s_line
+                    
+                    def repl_m(m):
+                        val = parse_jp_money(m.group(0))
+                        if val < 100000: return m.group(0)
+                        return f'<span class="hl-money" onclick="window.set_budget({val}, \'{safe_text}\')">{m.group(0)}</span>'
+                    
+                    def repl_p(m):
+                        val = parse_num(m.group(0))
+                        return f'<span class="hl-user" onclick="window.set_user({val}, \'{safe_text}\')">{m.group(0)}</span>'
+                    
                     proc = re_money.sub(repl_m, proc)
                     proc = re_ppl.sub(repl_p, proc)
                     safe_html += f"<div class='active-line'>{proc}</div>"
+                
+                elif any(k in s_line for k in KW):
+                    safe_html += f"<div class='context-line'>{s_line}</div>"
                 else:
-                    # Redact (Hide but clickable)
-                    # Use JS function to reveal
                     mask = "░" * min(len(s_line), 40)
                     safe_html += f"<div class='redacted' onclick=\"revealText(this, '{safe_text}')\">{mask}</div>"
 
@@ -266,16 +261,20 @@
             try: return float(s)
             except: return 0
 
-        def set_budget_py(val):
-            global current_budget
+        def set_budget_py(val, text):
+            global current_budget, evidence_budget
             current_budget = val
+            evidence_budget = text
             document.getElementById('disp-budget').innerText = f"¥{int(val):,}"
+            document.getElementById('ev-budget').innerText = f"\"{text}\""
             calc()
 
-        def set_user_py(val):
-            global current_users
+        def set_user_py(val, text):
+            global current_users, evidence_users
             current_users = val
+            evidence_users = text
             document.getElementById('disp-user').innerText = f"{int(val):,} 人"
+            document.getElementById('ev-user').innerText = f"\"{text}\""
             calc()
 
         def calc():
@@ -286,18 +285,70 @@
             box = document.getElementById('verdict-area')
             box.style.display = 'block'
             el_val.innerText = f"{d:.1f}"
-            if d > 10:
+            if d > 50:
                 el_res.innerText = "🚨 SCAM"
                 box.className = "verdict-box scam"
+            elif d > 10:
+                el_res.innerText = "⚠️ CRITICAL"
+                box.className = "verdict-box scam"
             else:
-                el_res.innerText = "✅ SAFE"
+                el_res.innerText = "✅ SUSTAINABLE"
                 box.className = "verdict-box safe"
 
-        def export_md(e):
-            fname = document.getElementById('doc-name').value
-            d_val = document.getElementById('d-val').innerText
-            md = f"# Audit: {fname}\n* Budget: {int(current_budget):,}\n* Users: {int(current_users):,}\n* D_Index: {d_val}\n\n(Generated by Pithos)"
-            js.downloadFile(f"Audit_{d_val}.md", md)
+        def export_report(e):
+            p_name = document.getElementById('project-name').value
+            d_val = float(document.getElementById('d-val').innerText)
+            
+            # --- AUTO COMMENT LOGIC ---
+            if d_val > 50:
+                rank = "🥇 WORST 1"
+                status = "SCAM (詐欺レベル)"
+                comment = "SBCM基準を大幅に逸脱しています。住民1人あたりの負担が異常であり、直ちに監査が必要です。典型的な『ハコモノ』または『中抜き』の疑いがあります。"
+            elif d_val > 10:
+                rank = "🥈 CRITICAL"
+                status = "High Distortion (歪み)"
+                comment = "費用対効果が極めて低いです。目的に対して予算が過大か、あるいは受益者が限定的すぎます。事業の縮小または廃止を検討すべきレベルです。"
+            elif d_val < 1:
+                rank = "💎 EXCELLENT"
+                status = "High Efficiency (高効率)"
+                comment = "極めて低コストで多くの市民にサービスを提供できています。他の自治体の模範となる『神運営』です。"
+            else:
+                rank = "✅ STANDARD"
+                status = "Normal Range (適正)"
+                comment = "SBCM基準内です。インフラとして適正なコストバランスが保たれています。"
+
+            # REPORT TEMPLATE
+            md = f"""# 🏛️ SBCM Audit Report
+**Date:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
+**Project:** {p_name}
+**Auditor:** Pithos Secure Module
+
+---
+
+## {rank}: {p_name}
+**～ {status} ～**
+
+*   **決算額:** ¥{int(current_budget):,}
+*   **推定受益者数:** {int(current_users):,} 人
+*   **歪み指数 ($D$):** **{d_val}**
+*   **1人あたりコスト:** ¥{int(current_budget/current_users):,} / 人
+
+### 💬 監査官コメント
+{comment}
+
+---
+
+## 🔍 Evidence (抽出根拠)
+> **予算ソース:**
+> "{evidence_budget}"
+>
+> **人数ソース:**
+> "{evidence_users}"
+
+---
+*Generated by Pithos OS*
+"""
+            js.downloadFile(f"SBCM_Audit_{p_name}.md", md)
 
         js.window.py_process_secure = create_proxy(process_secure)
         js.window.set_budget = create_proxy(set_budget_py)
