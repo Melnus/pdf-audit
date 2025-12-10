@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pithos | Forensic Auditor</title>
+    <title>Pithos | Secure Auditor</title>
     
-    <!-- Libraries -->
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -15,7 +14,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        :root { --bg: #000; --fg: #fff; --dim: #666; --border: 1px solid #fff; --accent: #00ff41; --mask: #222; }
+        :root { --bg: #000; --fg: #fff; --dim: #666; --border: 1px solid #fff; --accent: #00ff41; }
         * { box-sizing: border-box; }
         body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'JetBrains Mono', monospace; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
@@ -31,9 +30,8 @@
         /* VIEWER */
         #doc-view { 
             flex: 1; padding: 20px; overflow-y: auto; border-right: var(--border); 
-            font-size: 0.8rem; line-height: 1.6; color: #ccc; white-space: pre-wrap;
-            user-select: text; /* Allow selection for copy */
-            background: #000;
+            font-size: 0.8rem; line-height: 1.6; color: #aaa; white-space: pre-wrap;
+            user-select: none; -webkit-user-select: none; background: #000;
         }
 
         /* CONTROLS */
@@ -43,18 +41,25 @@
         .card { border: var(--border); padding: 15px; margin-bottom: 15px; background: #111; }
         .label { font-size: 0.7rem; color: #888; display: block; margin-bottom: 5px; }
         .val-display { font-size: 1.2rem; font-weight: bold; color: #fff; border-bottom: 1px solid #444; padding-bottom: 5px; }
-        .evidence-text { font-size: 0.7rem; color: #888; margin-top: 5px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        /* Highlights */
+        
         .hl-money { color: #ffd700; cursor: pointer; text-decoration: underline; font-weight: bold; }
         .hl-money:hover { background: rgba(255, 215, 0, 0.2); }
-        
         .hl-user { color: #00ffff; cursor: pointer; text-decoration: underline; font-weight: bold; }
         .hl-user:hover { background: rgba(0, 255, 255, 0.2); }
         
-        /* Context Awareness */
-        .redacted { color: #222; background: #111; letter-spacing: -3px; }
-        .context-line { color: #888; margin: 2px 0; border-left: 2px solid #333; padding-left: 8px; }
+        /* REDACTION LOGIC */
+        .redacted { 
+            color: #222; background: #111; letter-spacing: -3px; 
+            cursor: help; transition: 0.2s; border-bottom: 1px dotted #333;
+        }
+        .redacted:hover { background: #222; color: #444; }
+        
+        .revealed { 
+            color: #ccc; background: transparent; letter-spacing: normal; 
+            animation: fadeIn 0.5s; border-left: 2px solid #555; padding-left: 5px;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
         .active-line { color: #fff; margin: 2px 0; background: #111; padding: 2px 0; border-left: 2px solid var(--accent); padding-left: 8px; }
 
         .verdict-box { text-align: center; padding: 10px; margin-top: 10px; border: 1px solid #333; }
@@ -88,15 +93,19 @@
 
     <header>
         <div style="display:flex; align-items:center; gap:10px;">
-            <i class="fas fa-search-dollar" style="color:var(--accent);"></i>
-            <h1>FORENSIC AUDITOR</h1>
+            <i class="fas fa-shield-alt" style="color:var(--accent);"></i>
+            <h1>SECURE AUDITOR</h1>
         </div>
         <div class="sys-stat"><span id="stat-text">BOOTING...</span><div id="stat-dot" class="dot"></div></div>
     </header>
 
     <div id="workspace">
         <div id="doc-view">
-            <div style="text-align:center; color:#444; margin-top:50px;">// SECURE VIEWER //<br>Drop PDF to start forensic analysis.</div>
+            <div style="text-align:center; color:#444; margin-top:50px;">
+                // SECURE VIEWER //<br>
+                1. 数字が含まれる行はハイライトされます。<br>
+                2. 黒塗り部分はタップすると読めます。
+            </div>
         </div>
 
         <div id="audit-panel">
@@ -105,32 +114,24 @@
                     <span class="label">TARGET FILE</span>
                     <input type="text" id="doc-name" placeholder="..." disabled style="width:100%; background:transparent; border:none; color:#888;">
                 </div>
-                
                 <div class="card" style="border-color: #ffd700;">
                     <span class="label">1. BUDGET (予算)</span>
                     <div id="disp-budget" class="val-display">0</div>
-                    <div id="ev-budget" class="evidence-text">...</div>
                     <div style="font-size:0.7rem; color:#ffd700; margin-top:5px;">[TAP YELLOW TEXT]</div>
                 </div>
-
                 <div class="card" style="border-color: #00ffff;">
                     <span class="label">2. USERS (人数)</span>
                     <div id="disp-user" class="val-display">0</div>
-                    <div id="ev-user" class="evidence-text">...</div>
                     <div style="font-size:0.7rem; color:#00ffff; margin-top:5px;">[TAP BLUE TEXT]</div>
                 </div>
-
                 <div id="verdict-area" class="verdict-box" style="display:none;">
-                    <div style="font-size:0.7rem;">D_INDEX (歪み指数)</div>
+                    <div style="font-size:0.7rem;">D_INDEX</div>
                     <div id="d-val" style="font-size:2.5rem; font-weight:bold;">0.0</div>
                     <div id="d-res">---</div>
                 </div>
             </div>
-            
             <div style="padding:20px; border-top:var(--border);">
-                <button class="btn-action" py-click="export_report">
-                    <i class="fas fa-file-export"></i> GENERATE REPORT
-                </button>
+                <button class="btn-action" py-click="export_md">EXPORT</button>
                 <button class="btn-action" style="background:#000; color:#888; border-color:#444;" onclick="location.reload()">RESET</button>
             </div>
         </div>
@@ -141,10 +142,17 @@
             <button id="btn-select" class="btn-upload" disabled onclick="document.getElementById('file-in').click()">INITIALIZING...</button>
             <input type="file" id="file-in" style="display:none;" accept="application/pdf">
         </div>
-        <div id="loading"><i class="fas fa-cog fa-spin" style="font-size:2rem;"></i><br><br>CONTEXT ANALYSIS...</div>
+        <div id="loading"><i class="fas fa-cog fa-spin" style="font-size:2rem;"></i><br><br>ANALYZING...</div>
     </div>
 
+    <!-- JS: REVEAL LOGIC -->
     <script>
+        function revealText(el, originalText) {
+            el.innerText = originalText;
+            el.className = "revealed";
+            el.onclick = null; // Remove handler
+        }
+
         const fileIn = document.getElementById('file-in');
         fileIn.onchange = (e) => { if (e.target.files[0]) loadPDF(e.target.files[0]); };
 
@@ -192,21 +200,14 @@
         }
     </script>
 
+    <!-- PYTHON -->
     <script type="py">
         from pyscript import document
         from pyodide.ffi import create_proxy
         import js, re
-        from datetime import datetime
         
         current_budget = 0
         current_users = 0
-        
-        # Evidence Storage
-        evidence_budget = ""
-        evidence_users = ""
-
-        # KEYWORDS for Context (Expanded)
-        KW = ["予算", "決算", "事業", "概要", "目的", "成果", "合計", "歳出", "歳入", "内訳", "費用", "対象", "【", "】", "■", "●", "・", "円", "人", "年度", "基金", "繰入", "補正", "委託", "工事"]
         
         re_money = re.compile(r'([0-9,]+(兆|億|万|千)?円)')
         re_ppl = re.compile(r'([0-9,]+(人|名|世帯))')
@@ -215,59 +216,38 @@
             lines = raw_text.split('\n')
             safe_html = ""
             
-            # Context Logic: Keep -1, 0, +1 lines around hits
-            keep_indices = set()
-            
-            # First pass: Identify relevant lines
-            for i, line in enumerate(lines):
+            # Helper: Replacers
+            def repl_m(m):
+                val = parse_jp_money(m.group(0))
+                if val < 100000: return m.group(0)
+                return f'<span class="hl-money" onclick="window.set_budget({val})">{m.group(0)}</span>'
+
+            def repl_p(m):
+                val = parse_num(m.group(0))
+                return f'<span class="hl-user" onclick="window.set_user({val})">{m.group(0)}</span>'
+
+            for line in lines:
                 s_line = line.strip()
                 if not s_line: continue
                 
+                # Check for data
                 has_m = re_money.search(s_line)
                 has_p = re_ppl.search(s_line)
-                is_kw = any(k in s_line for k in KW)
                 
-                if has_m or has_p:
-                    keep_indices.add(i)
-                    if i > 0: keep_indices.add(i-1) # Prev
-                    if i < len(lines)-1: keep_indices.add(i+1) # Next
-                elif is_kw or len(s_line) < 40:
-                    keep_indices.add(i)
+                # Encode text for JS safety
+                safe_text = s_line.replace('"', '&quot;').replace("'", "&#39;")
 
-            # Second pass: Render
-            for i, line in enumerate(lines):
-                s_line = line.strip()
-                if not s_line: continue
-                
-                if i in keep_indices:
-                    # Render Visible Line
-                    processed = s_line
-                    
-                    # Inject Click Handlers (Python string formatting for JS call)
-                    # We escape single quotes in text to avoid JS errors
-                    safe_text = s_line.replace("'", "").replace('"', '')
-                    
-                    def repl_m(m):
-                        val = parse_jp_money(m.group(0))
-                        if val < 100000: return m.group(0)
-                        return f'<span class="hl-money" onclick="window.set_budget({val}, \'{safe_text}\')">{m.group(0)}</span>'
-                    
-                    def repl_p(m):
-                        val = parse_num(m.group(0))
-                        return f'<span class="hl-user" onclick="window.set_user({val}, \'{safe_text}\')">{m.group(0)}</span>'
-                    
-                    processed = re_money.sub(repl_m, processed)
-                    processed = re_ppl.sub(repl_p, processed)
-                    
-                    # Highlight Active Lines vs Context
-                    has_data = re_money.search(s_line) or re_ppl.search(s_line)
-                    cls = "active-line" if has_data else "context-line"
-                    
-                    safe_html += f"<div class='{cls}'>{processed}</div>"
+                if has_m or has_p:
+                    # Active Line (Show)
+                    proc = s_line
+                    proc = re_money.sub(repl_m, proc)
+                    proc = re_ppl.sub(repl_p, proc)
+                    safe_html += f"<div class='active-line'>{proc}</div>"
                 else:
-                    # Redact
+                    # Redact (Hide but clickable)
+                    # Use JS function to reveal
                     mask = "░" * min(len(s_line), 40)
-                    safe_html += f"<div class='redacted'>{mask}</div>"
+                    safe_html += f"<div class='redacted' onclick=\"revealText(this, '{safe_text}')\">{mask}</div>"
 
             document.getElementById('doc-view').innerHTML = safe_html
             document.getElementById('loading').style.display = 'none'
@@ -286,21 +266,16 @@
             try: return float(s)
             except: return 0
 
-        # Handlers
-        def set_budget_py(val, text):
-            global current_budget, evidence_budget
+        def set_budget_py(val):
+            global current_budget
             current_budget = val
-            evidence_budget = text
             document.getElementById('disp-budget').innerText = f"¥{int(val):,}"
-            document.getElementById('ev-budget').innerText = f"\"{text}\""
             calc()
 
-        def set_user_py(val, text):
-            global current_users, evidence_users
+        def set_user_py(val):
+            global current_users
             current_users = val
-            evidence_users = text
             document.getElementById('disp-user').innerText = f"{int(val):,} 人"
-            document.getElementById('ev-user').innerText = f"\"{text}\""
             calc()
 
         def calc():
@@ -312,51 +287,17 @@
             box.style.display = 'block'
             el_val.innerText = f"{d:.1f}"
             if d > 10:
-                el_res.innerText = "🚨 SCAM / DISTORTION"
+                el_res.innerText = "🚨 SCAM"
                 box.className = "verdict-box scam"
             else:
-                el_res.innerText = "✅ SUSTAINABLE"
+                el_res.innerText = "✅ SAFE"
                 box.className = "verdict-box safe"
 
-        def export_report(e):
+        def export_md(e):
             fname = document.getElementById('doc-name').value
             d_val = document.getElementById('d-val').innerText
-            verdict = document.getElementById('d-res').innerText
-            date = datetime.now().strftime("%Y-%m-%d %H:%M")
-            
-            md = f"""# 🏛️ SBCM Administrative Forensic Report
-**Date:** {date}
-**Target Document:** {fname}
-**Auditor:** Pithos Secure Module
-
----
-
-## 📊 Audit Result
-| Metric | Value |
-| :--- | :--- |
-| **Distortion Index** | **{d_val}** |
-| **Verdict** | **{verdict}** |
-
----
-
-## 🔍 Evidence (抽出根拠)
-
-### 1. Budget (予算)
-> **¥{int(current_budget):,}**
->
-> *Source Text:*
-> "{evidence_budget}"
-
-### 2. Beneficiaries (対象者数)
-> **{int(current_users):,} Users**
->
-> *Source Text:*
-> "{evidence_users}"
-
----
-*Generated by Pithos OS (Serverless Architecture)*
-"""
-            js.downloadFile(f"SBCM_Report_{fname}.md", md)
+            md = f"# Audit: {fname}\n* Budget: {int(current_budget):,}\n* Users: {int(current_users):,}\n* D_Index: {d_val}\n\n(Generated by Pithos)"
+            js.downloadFile(f"Audit_{d_val}.md", md)
 
         js.window.py_process_secure = create_proxy(process_secure)
         js.window.set_budget = create_proxy(set_budget_py)
